@@ -1,0 +1,17 @@
+{
+  "accountAssociation": {
+    "header": "ВАШ_HEADER_ИЗ_ПАНЕЛИ_FARCASTER",
+    "payload": "ВАШ_PAYLOAD_ИЗ_ПАНЕЛИ_FARCASTER",
+    "signature": "ВАША_SIGNATURE_ИЗ_ПАНЕЛИ_FARCASTER"
+  },
+  "frame": {
+    "version": "1",
+    "name": "Base Flow",
+    "iconUrl": "https://base-flow-five.vercel.app/icon.png",
+    "homeUrl": "https://base-flow-five.vercel.app/",
+    "imageUrl": "https://base-flow-five.vercel.app/og-image.png",
+    "buttonTitle": "Launch Flow",
+    "splashImageUrl": "https://base-flow-five.vercel.app/splash.png",
+    "splashBackgroundColor": "#050505"
+  }
+}
