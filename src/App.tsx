@@ -5,34 +5,95 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Zap, Info, Share2, Wallet } from 'lucide-react';
+import { Shield, Zap, Info, Share2, Wallet, Link as LinkIcon } from 'lucide-react';
+import { createConfig, http, WagmiProvider, useAccount, useConnect, useDisconnect, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { base } from 'wagmi/chains';
+import { injected } from 'wagmi/connectors';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { parseAbi } from 'viem';
 
-// Base Builder Code for attribution (example)
-// In a real app, you'd get this from Base
+// Wagmi Setup
+const config = createConfig({
+  chains: [base],
+  connectors: [injected()],
+  transports: {
+    [base.id]: http(),
+  },
+});
+
+const queryClient = new QueryClient();
+
+// Base Builder Code for attribution
 const BUILDER_CODE = "0x420"; 
 
-export default function App() {
+// Contract Configuration
+const CONTRACT_ADDRESS = "0xB2dFDB4790A8cE47Cd2A7662A90A12DE3459084c";
+const CONTRACT_ABI = parseAbi([
+  'function checkIn() external',
+  'function lastCheckIn(address) view returns (uint256)',
+  'event UserCheckedIn(address indexed user, uint256 timestamp)'
+]);
+
+function BaseFlowContent() {
+  const { address, isConnected } = useAccount();
+  const { connect } = useConnect();
+  const { disconnect } = useDisconnect();
+  
+  // Contract Hooks
+  const { writeContract, data: hash, isPending: isWritePending, error: writeError } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+
+  const { data: lastCheckInTimestamp } = useReadContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    functionName: 'lastCheckIn',
+    args: [address as `0x${string}`],
+    query: {
+      enabled: !!address,
+    }
+  });
+
   const [power, setPower] = useState(0);
   const [isCharging, setIsCharging] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [history, setHistory] = useState<{ id: number; value: number; time: string; type?: 'flow' | 'checkin' }[]>([]);
   const [lastCheckIn, setLastCheckIn] = useState<string | null>(null);
-  const [isCheckingIn, setIsCheckingIn] = useState(false);
   const requestRef = useRef<number>(null);
+
+  // Sync onchain check-in with local state
+  useEffect(() => {
+    if (lastCheckInTimestamp) {
+      const date = new Date(Number(lastCheckInTimestamp) * 1000);
+      if (date.getTime() > 0) {
+        setLastCheckIn(date.toDateString());
+      }
+    }
+  }, [lastCheckInTimestamp]);
+
+  // Handle successful transaction
+  useEffect(() => {
+    if (isConfirmed) {
+      const newEntry = {
+        id: Date.now(),
+        value: 0,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'checkin' as const
+      };
+      setHistory(prev => [newEntry, ...prev].slice(0, 5));
+      setLastCheckIn(new Date().toDateString());
+    }
+  }, [isConfirmed]);
 
   // Load state from localStorage
   useEffect(() => {
     const savedHistory = localStorage.getItem('base_flow_history');
-    const savedCheckIn = localStorage.getItem('base_flow_last_checkin');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
-    if (savedCheckIn) setLastCheckIn(savedCheckIn);
   }, []);
 
   // Save state to localStorage
   useEffect(() => {
     localStorage.setItem('base_flow_history', JSON.stringify(history));
-    localStorage.setItem('base_flow_last_checkin', lastCheckIn || '');
-  }, [history, lastCheckIn]);
+  }, [history]);
 
   const handleStart = () => setIsCharging(true);
   const handleEnd = () => {
@@ -50,25 +111,18 @@ export default function App() {
   };
 
   const handleCheckIn = async () => {
-    if (isCheckingIn || lastCheckIn === new Date().toDateString()) return;
+    if (isWritePending || isConfirming || lastCheckIn === new Date().toDateString()) return;
 
-    setIsCheckingIn(true);
-    
-    // Simulate Blockchain Transaction
-    // In a real app, you would use useWriteContract from wagmi here
-    await new Promise(resolve => setTimeout(resolve, 2500));
-
-    const newEntry = {
-      id: Date.now(),
-      value: 0,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: 'checkin' as const
-    };
-
-    setHistory(prev => [newEntry, ...prev].slice(0, 5));
-    setLastCheckIn(new Date().toDateString());
-    setIsCheckingIn(false);
+    writeContract({
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      abi: CONTRACT_ABI,
+      functionName: 'checkIn',
+      account: address,
+      chain: base,
+    });
   };
+
+  const isCheckingIn = isWritePending || isConfirming;
 
   const update = useCallback(() => {
     if (isCharging) {
@@ -83,6 +137,8 @@ export default function App() {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
   }, [update]);
+
+  const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-between p-8 font-sans selection:bg-blue-500/30">
@@ -105,12 +161,32 @@ export default function App() {
           </div>
           <span className="font-medium tracking-tight text-white/90">Base Flow</span>
         </div>
-        <button 
-          onClick={() => setShowInfo(!showInfo)}
-          className="p-2 rounded-full hover:bg-white/5 transition-colors text-white/40 hover:text-white"
-        >
-          <Info size={20} />
-        </button>
+        
+        <div className="flex items-center gap-3">
+          {isConnected ? (
+            <button 
+              onClick={() => disconnect()}
+              className="glass-panel px-3 py-1.5 rounded-full text-[10px] font-mono text-white/60 hover:text-white transition-colors flex items-center gap-2"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {formatAddress(address!)}
+            </button>
+          ) : (
+            <button 
+              onClick={() => connect({ connector: injected() })}
+              className="bg-white text-black px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-white/90 transition-colors flex items-center gap-2"
+            >
+              <LinkIcon size={12} />
+              Connect
+            </button>
+          )}
+          <button 
+            onClick={() => setShowInfo(!showInfo)}
+            className="p-2 rounded-full hover:bg-white/5 transition-colors text-white/40 hover:text-white"
+          >
+            <Info size={20} />
+          </button>
+        </div>
       </header>
 
       {/* Main Experience */}
@@ -199,14 +275,16 @@ export default function App() {
           
           <button 
             onClick={handleCheckIn}
-            disabled={isCheckingIn || lastCheckIn === new Date().toDateString()}
+            disabled={!isConnected || isCheckingIn || lastCheckIn === new Date().toDateString()}
             className={`relative px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
-              lastCheckIn === new Date().toDateString() 
+              !isConnected || lastCheckIn === new Date().toDateString() 
                 ? 'bg-white/5 text-white/20 cursor-default' 
                 : 'bg-[#0052FF] text-white hover:shadow-[0_0_20px_rgba(0,82,255,0.4)] active:scale-95'
             }`}
           >
-            {isCheckingIn ? (
+            {!isConnected ? (
+              'Connect First'
+            ) : isCheckingIn ? (
               <motion.div 
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
@@ -302,5 +380,15 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <BaseFlowContent />
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }
