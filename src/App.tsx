@@ -24,7 +24,9 @@ const config = createConfig({
 const queryClient = new QueryClient();
 
 // Base Builder Code for attribution
-const BUILDER_CODE = "0x420"; 
+const BUILDER_CODE_RAW = "bc_yg9xevtd"; 
+// Hex representation of "bc_yg9xevtd" is "62635f7967397865767464"
+const BUILDER_CODE_HEX = "0x62635f7967397865767464"; 
 
 // Contract Configuration
 const CONTRACT_ADDRESS = "0xB2dFDB4790A8cE47Cd2A7662A90A12DE3459084c";
@@ -113,12 +115,17 @@ function BaseFlowContent() {
   const handleCheckIn = async () => {
     if (isWritePending || isConfirming || lastCheckIn === new Date().toDateString()) return;
 
+    // To attribute the transaction, we append the hex-encoded builder code to the data
+    // Wagmi's writeContract allows passing 'data' but for function calls it generates it.
+    // We use the 'dataSuffix' or manually encode if needed. 
+    // According to Base docs, it's just appended to the calldata.
     writeContract({
       address: CONTRACT_ADDRESS as `0x${string}`,
       abi: CONTRACT_ABI,
       functionName: 'checkIn',
       account: address,
       chain: base,
+      dataSuffix: BUILDER_CODE_HEX as `0x${string}`,
     });
   };
 
@@ -256,7 +263,7 @@ function BaseFlowContent() {
         <div className="mt-12 flex flex-col items-center gap-1">
           <div className="flex items-center gap-2 text-white/30 text-[11px] uppercase tracking-widest font-medium">
             <Shield size={12} />
-            <span>Builder Code Active: {BUILDER_CODE}</span>
+            <span>Builder Code Active: {BUILDER_CODE_RAW}</span>
           </div>
           <div className="h-[1px] w-12 bg-white/10 mt-4" />
         </div>
