@@ -1,8 +1,8 @@
 {
   "accountAssociation": {
-    "header": "ВАШ_HEADER_ИЗ_ПАНЕЛИ_FARCASTER",
-    "payload": "ВАШ_PAYLOAD_ИЗ_ПАНЕЛИ_FARCASTER",
-    "signature": "ВАША_SIGNATURE_ИЗ_ПАНЕЛИ_FARCASTER"
+    "header": "eyJmaWQiOjg2NDI5MSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDc0OTY2QzhDMWYwNDBDMDA4RDVGMWEyOGE0OUY0ZDc1NmUxYUYxNGYifQ",
+    "payload": "eyJkb21haW4iOiJiYXNlLWZsb3ctZml2ZS52ZXJjZWwuYXBwIn0",
+    "signature": "xNarRwYixv69SX0t1186Oxs9xGZNrzDMkqHZWmQypp1+knvtOK3zMIP2pkzhmy5yuloMOPCU4oUOIoHka5p7pRs="
   },
   "frame": {
     "version": "1",
